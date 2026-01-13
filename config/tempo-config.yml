@@ -1,0 +1,25 @@
+# Configuração do Tempo para desenvolvimento local.
+# NOTA: Este é o bloco COMPLETO e CORRIGIDO.
+# Não deve ter mais nenhuma linha ou secção.
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+# Utiliza armazenamento local para persistência através do volume 'tempo-data' (montado em /var/tempo)
+storage:
+  trace:
+    backend: local
+    local:
+      # Caminho para o ponto de montagem do volume persistente no container
+      path: /var/tempo/traces
+    wal:
+      # Caminho para o ponto de montagem do volume persistente no container
+      path: /var/tempo/wal

@@ -1,0 +1,141 @@
+networks:
+  # Rede isolada para comunicação entre microserviços e stack de monitorização
+  microservices-net:
+    driver: bridge
+
+volumes:
+  # Volumes para persistência de dados após reinicialização dos contentores
+  tempo-data:
+  loki-data:
+  prometheus-data:
+  grafana-data:
+  promtail-positions:
+
+services:
+  # --- Serviço de Utilizadores ---
+  users-service:
+    build:
+      context: .
+      dockerfile: app/users/Dockerfile.users
+    image: users-service:latest
+    environment:
+      # Endpoint para onde o código Python envia os spans (traces)
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_SERVICE_NAME: users-service
+      ENVIRONMENT: docker
+    ports:
+      - "5000:5000"
+    networks:
+      - microservices-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # --- Serviço de Produtos ---
+  products-service:
+    build:
+      context: .
+      dockerfile: app/products/Dockerfile.products
+    image: products-service:latest
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_SERVICE_NAME: products-service
+      USERS_SERVICE_URL: http://users-service:5000
+      ENVIRONMENT: docker
+    ports:
+      - "5001:5001"
+    networks:
+      - microservices-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # --- Coletor OpenTelemetry (Ponte de Tracing) ---
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.90.1
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      # Mapeamento do ficheiro de configuração (extensão .yml preservada)
+      - ./config/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    ports:
+      - "4317:4317" # gRPC para Traces/Metrics
+      - "4318:4318" # HTTP para Traces/Metrics
+      - "8889:8889" # Mudança estratégica: 8889 (Host) mapeia para 8888 (Container)
+    networks:
+      - microservices-net
+
+  # --- Grafana Tempo (Armazenamento de Traces) ---
+  tempo:
+    image: grafana/tempo:2.2.3
+    container_name: grafana-tempo
+    command: ["-config.file=/etc/tempo.yml"]
+    volumes:
+      - ./config/tempo-config.yml:/etc/tempo.yml:ro
+      - tempo-data:/tmp/tempo
+    ports:
+      - "3200:3200" 
+    networks:
+      - microservices-net
+
+  # --- Grafana Loki (Armazenamento de Logs) ---
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: grafana-loki
+    ports:
+      - "3100:3100"
+    volumes: 
+      - loki-data:/loki  #
+    command: -config.file=/etc/loki/local-config.yaml   
+    networks:
+      - microservices-net
+
+  # --- Prometheus (Métricas) ---
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - microservices-net
+
+  # --- Grafana (Visualização e Dashboards) ---
+  grafana:
+    image: grafana/grafana:10.2.2
+    environment:
+      # Se não houver export, o Docker usará 'admin' como fallback
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASS}
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      
+    volumes:
+      # Provisionamento automático de Data Sources e Dashboards (.yml)
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # --- Promtail (Agente de Logs) ---
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    user: root
+    # Permissões elevadas para ler os logs dos contentores no host
+    privileged: true 
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./config/promtail-config.yml:/etc/promtail/config.yml:ro
+      - promtail-positions:/tmp
+    command: -config.file=/etc/promtail/config.yml -config.expand-env=true
+    networks:
+      - microservices-net
