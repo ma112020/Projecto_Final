@@ -1,0 +1,83 @@
+# Ficheiro .gitignore - Ignora todos os ficheiros gerados, cache e dados temporários.
+
+#1. AMBIENTE VIRTUAL E CACHE (Python)
+
+#Ignora o ambiente virtual
+
+.venv/
+venv/
+ENV/
+env/
+bin/
+lib/
+include/
+share/
+pip-selfcheck.json
+
+#2. Cache e arquivos compilados
+
+p**/pycache/
+**/.pyc
+**/.pyo
+**/*.pyd
+.Python
+*.so
+
+#3. RELATÓRIOS E OUTPUTS (Gerados por QA/Segurança/Testes)
+
+..log
+.coverage
+**/htmlcov/
+**/.pytest_cache/
+**/.tox/̣
+**/.nox/
+**/coverage.xml
+**/.hypothesis/
+bandit-report.json
+flake8-report.txt
+trivy-*.json
+Relatorio_final.md
+*.pdf
+
+
+#4.  DOCKER VOLUMES E DADOS PERSISTENTES (DADOS BINÁRIOS)
+
+**/prometheus_data/
+**/loki_data/
+**/tempo_data/
+**/grafana_data/
+**/data/
+
+# 5. CONFIGURAÇÕES SENSÍVEIS E AMBIENTE
+
+.env
+.env.*
+!.env.example
+
+
+# 7.  DISTRIBUIÇÃO E BUILDS
+
+**/dist/
+**/build/
+**/.egg-info/
+**/.egg
+
+
+# 8. IDEs E SISTEMA OPERATIVO
+
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.idea/
+.vscode/
+*.swp
+*.swo
+.project
+.settings/
+.pydevproject
+
+#9. EXCEPÇÕES (GARANTIR ESTRUTURA)
+
+!.gitkeep
