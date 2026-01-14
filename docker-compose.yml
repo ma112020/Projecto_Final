@@ -60,7 +60,7 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.90.1
     container_name: otel-collector
-    user: root
+    user: "0:0"
     command: ["--config=/etc/otel-collector-config.yml"]
     volumes:
       # Mapeamento do ficheiro de configuração (extensão .yml preservada)
@@ -76,7 +76,7 @@ services:
   tempo:
     image: grafana/tempo:2.2.3
     container_name: grafana-tempo
-    user: root
+    user: "0:0"
     command: ["-config.file=/etc/tempo.yml"]
     volumes:
       - ./config/tempo-config.yml:/etc/tempo.yml:ro
@@ -90,7 +90,7 @@ services:
   loki:
     image: grafana/loki:2.9.2
     container_name: grafana-loki
-    user: root
+    user: "0:0"
     ports:
       - "3100:3100"
     volumes: 
@@ -103,7 +103,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.48.0
     container_name: prometheus
-    user: root
+    user: "0:0"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -116,7 +116,7 @@ services:
   grafana:
     image: grafana/grafana:10.2.2
     container_name: grafana
-    user: root
+    user: "0:0"
     environment:
       # Se não houver export, o Docker usará 'admin' como fallback
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
@@ -138,7 +138,7 @@ services:
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
-    user: root
+    user: "0:0"
     # Permissões elevadas para ler os logs dos contentores no host
     privileged: true 
     volumes:

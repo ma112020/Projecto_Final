@@ -258,6 +258,7 @@ docker-build:
 
 docker-up: 
 	@echo "--- [DOCKER] A levantar serviços existentes (Sem Build) ---"
+	chmod -R 755 config/
 	docker compose up -d
 	@echo "A aguardar estabilização (5s)..."
 	@sleep 5
@@ -297,6 +298,7 @@ docker-run:
 
 	@echo "--- [DOCKER-RUN] Iniciando ciclo exclusivo em Contentores ---"
 	@# Garantir que a pasta de relatórios para o docker existe antes de iniciar
+	chmod -R 755 config/
 	@mkdir -p reports/docker
 	@chmod -R 777 reports/docker 2>/dev/null || true
 
