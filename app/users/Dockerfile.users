@@ -8,8 +8,9 @@ WORKDIR /build
 COPY app/users/requirements.txt .
 
 # Instala as dependências de forma segura e limpa (sem cache)
-RUN pip install --upgrade pip>=25.2
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip>=25.2 && \
+    pip install --no-cache-dir "jaraco.context>=6.1.0" && \
+    pip install --no-cache-dir -r requirements.txt
 
 # --- 2. FASE FINAL (Runtime Stage) ---
 FROM python:3.11-slim AS stage-1    
@@ -39,6 +40,13 @@ WORKDIR ${APP_HOME}
 # Copia as dependências instaladas na fase de construção
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+
+# --- [BLINDAGEM TRIVY] ---
+# O pip pode deixar metadados da versão antiga (5.3.0) que enganam o scanner.
+# Como estamos em stage-1 (slim), limpamos qualquer rasto antes de mudar para o utilizador final.
+USER root
+RUN find /usr/local/lib/python3.11/site-packages -name "*jaraco.context-5.3.0*" -exec rm -rf {} + || true
+# -------------------------
 
 # Copia a pasta 'shared' e 'app' (incluindo app/users)
 COPY app/shared ${APP_HOME}/shared
