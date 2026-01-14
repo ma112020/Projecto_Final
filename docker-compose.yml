@@ -18,6 +18,7 @@ services:
       context: .
       dockerfile: app/users/Dockerfile.users
     image: users-service:latest
+    container_name: users-service
     environment:
       # Endpoint para onde o código Python envia os spans (traces)
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
@@ -39,6 +40,7 @@ services:
       context: .
       dockerfile: app/products/Dockerfile.products
     image: products-service:latest
+    container_name: products-service
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_SERVICE_NAME: products-service
@@ -57,6 +59,8 @@ services:
   # --- Coletor OpenTelemetry (Ponte de Tracing) ---
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.90.1
+    container_name: otel-collector
+    user: root
     command: ["--config=/etc/otel-collector-config.yml"]
     volumes:
       # Mapeamento do ficheiro de configuração (extensão .yml preservada)
@@ -72,6 +76,7 @@ services:
   tempo:
     image: grafana/tempo:2.2.3
     container_name: grafana-tempo
+    user: root
     command: ["-config.file=/etc/tempo.yml"]
     volumes:
       - ./config/tempo-config.yml:/etc/tempo.yml:ro
@@ -85,6 +90,7 @@ services:
   loki:
     image: grafana/loki:2.9.2
     container_name: grafana-loki
+    user: root
     ports:
       - "3100:3100"
     volumes: 
@@ -96,6 +102,8 @@ services:
   # --- Prometheus (Métricas) ---
   prometheus:
     image: prom/prometheus:v2.48.0
+    container_name: prometheus
+    user: root
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -107,6 +115,8 @@ services:
   # --- Grafana (Visualização e Dashboards) ---
   grafana:
     image: grafana/grafana:10.2.2
+    container_name: grafana
+    user: root
     environment:
       # Se não houver export, o Docker usará 'admin' como fallback
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}

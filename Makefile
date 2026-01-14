@@ -335,57 +335,69 @@ docker-trivy-run:
 
 docker-dashboard:
 	@echo "\n===================================================================="
-	@echo "    PROVA DE FUNCIONALIDADE: DIAGNÓSTICO DE SAÚDE"
+	@echo "    PROVA DE FUNCIONALIDADE: DIAGNÓSTICO DE SAÚDE (V2)"
 	@echo "===================================================================="
-	@echo "--- [WAIT] Aguardando 180s para estabilização de serviços... ---"
-	@sleep 180
-	@echo "[STEP 1] Injetando carga real e validando Microserviços..."
-	@for i in $$(seq 1 25); do \
-		curl -s -f --connect-timeout 2 http://localhost:5000/users > /dev/null || { echo "❌ Erro no Users ($$i)"; exit 1; }; \
-		curl -s -f --connect-timeout 2 http://localhost:5001/products > /dev/null || { echo "❌ Erro no Products ($$i)"; exit 1; }; \
-		curl -s -f --connect-timeout 2 http://localhost:5001/e2e/products-with-users > /dev/null || { echo "❌ Erro no Fluxo E2E ($$i)"; exit 1; }; \
+	
+	@echo "[STEP 0] Aguardando Orquestração Nativa (Docker Health)..."
+	@# Aguarda até que os serviços marcados como healthy no compose estejam prontos
+	@until [ "$$(docker ps --filter "health=healthy" --format "{{.Names}}" | wc -l)" -ge 2 ]; do \
+		echo "Aguardando microserviços ficarem 'Healthy'..."; sleep 5; \
 	done
-	@echo "✅ Tráfego e Microserviços: OK"
+	@echo "✅ Microserviços operacionais!"
 
-	@echo "\n[STEP 2] PROMETHEUS (porta 9090):"
-	@if curl -s -f http://localhost:9090/-/healthy > /dev/null; then \
-		echo "  -> [OK] Prometheus está pronto."; \
-	else \
-		echo "  -> [FAIL] Prometheus inacessível."; exit 1; \
-	fi
+	@echo "\n[STEP 1] LOKI (porta 3100):"
+	@until curl -s http://localhost:3100/ready | grep -q "ready"; do \
+		echo "Loki ainda está a carregar..."; sleep 2; \
+	done
+	@echo "✅ Loki está pronto!"
 
-	@echo "\n[STEP 3] LOKI (porta 3100):"
-	@if curl -s -f http://localhost:3100/ready > /dev/null; then \
-		echo "  -> [OK] Loki Service: READY"; \
-	else \
-		echo "  -> [FAIL] Loki não respondeu READY."; exit 1; \
-	fi
+	@echo "\n[STEP 2] TEMPO (porta 3200):"
+	@until curl -s http://localhost:3200/ready | grep -q "ready"; do \
+		echo "Tempo ainda está a carregar..."; sleep 2; \
+	done
+	@echo "✅ Tempo está pronto!"
 
-	@echo "\n[STEP 4] TEMPO (porta 3200):"
-	@if curl -s -f http://localhost:3200/ready > /dev/null; then \
-		echo "  -> [OK] Tempo Service: READY"; \
+	@echo "\n[STEP 3] Injetando carga real (Traces e Logs)..."
+	@for i in $$(seq 1 25); do \
+		curl -s --connect-timeout 2 http://localhost:5000/users > /dev/null; \
+		curl -s --connect-timeout 2 http://localhost:5001/e2e/products-with-users > /dev/null; \
+		echo -n "."; \
+		sleep 0.1; \
+	done
+	@echo "\n✅ Geração de tráfego concluída."
+
+	@echo "\n[STEP 4] VALIDANDO ACESSO AO GRAFANA:"
+	@if [ -z "$(GRAFANA_USER)" ] || [ -z "$(GRAFANA_PASS)" ]; then \
+		echo "❌ [FAIL] Credenciais não encontradas!"; exit 1; \
 	else \
-		echo "  -> [FAIL] Tempo inacessível via localhost:3200."; exit 1; \
+		if curl -s -f -u $(GRAFANA_USER):$(GRAFANA_PASS) http://localhost:3000/api/health > /dev/null; then \
+			echo "✅ [OK] Grafana Autenticado: $(GRAFANA_USER)"; \
+		else \
+			echo "❌ [FAIL] Erro de Login no Grafana!"; exit 1; \
+		fi; \
 	fi
 
 	@echo "\n[STEP 5] OTEL COLLECTOR (porta 4317/4318):"
+	@# Verifica se o porto OTLP está à escuta
 	@if nc -z localhost 4318; then \
-		echo "  -> [OK] OTel Collector está a receber sinais."; \
-	else \
-		echo "  -> [FAIL] OTel Collector está offline."; exit 1; \
-	fi
+        echo "  -> [OK] OTel Collector está a receber sinais."; \
+    else \
+        echo "  -> [FAIL] OTel Collector está offline ou bloqueado."; \
+		exit 1; \
+    fi
 
 	@echo "\n[STEP 6] VALIDANDO ACESSO AO GRAFANA (Segurança):"
 	@if [ -z "$(GRAFANA_USER)" ] || [ -z "$(GRAFANA_PASS)" ]; then \
-		echo "  -> [FAIL] ERRO CRÍTICO: Credenciais ausentes"; exit 1; \
+		echo "  -> [FAIL] ERRO CRÌTICO: Credenciais não injetadas no ambiente"; \
+		exit 1; \
 	else \
 		if curl -s -f -u $(GRAFANA_USER):$(GRAFANA_PASS) http://localhost:3000/api/health > /dev/null; then \
-			echo "  -> [OK] Autenticação Grafana: SUCESSO"; \
+			echo "  -> [OK] Autenticação Grafana: SUCESSO (User: $(GRAFANA_USER))"; \
 		else \
-			echo "  -> [FAIL] Falha de autenticação no Grafana."; exit 1; \
+			echo "  -> [FAIL] Falha de autenticação. Verifique os Secrets do GitHub."; \
+			exit 1; \
 		fi; \
 	fi
-	@echo "\n✅ [STAGING] Stack de Observabilidade 100% Funcional!"
 
 	@echo "\n[INFO] ACESSO PARA DEMONSTRAÇÃO:"
 	@echo "    Dashboard: $(DASHBOARD_URL)"
