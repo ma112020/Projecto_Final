@@ -337,8 +337,8 @@ docker-dashboard:
 	@echo "\n===================================================================="
 	@echo "    PROVA DE FUNCIONALIDADE: DIAGNÓSTICO DE SAÚDE"
 	@echo "===================================================================="
-	@echo "--- [WAIT] Aguardando 80s para estabilização de serviços... ---"
-	@sleep 80
+	@echo "--- [WAIT] Aguardando 180s para estabilização de serviços... ---"
+	@sleep 180
 	@echo "[STEP 1] Injetando carga real e validando Microserviços..."
 	@for i in $$(seq 1 25); do \
 		curl -s -f --connect-timeout 2 http://localhost:5000/users > /dev/null || { echo "❌ Erro no Users ($$i)"; exit 1; }; \
