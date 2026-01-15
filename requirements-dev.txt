@@ -53,7 +53,7 @@ opentelemetry-instrumentation-requests==0.46b0
 opentelemetry-proto==1.39.1
 opentelemetry-sdk==1.25.0
 opentelemetry-semantic-conventions==0.46b0
-opentelemetry-util-http==0.46b0
+opentelemetry-util-http==0.60b1
 orjson==3.11.5
 packaging==25.0
 pathspec==0.12.1
