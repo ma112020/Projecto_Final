@@ -20,7 +20,7 @@ jobs:
     environment: develop
     steps:
       - name: Checkout Código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configurar Python
         uses: actions/setup-python@v5
@@ -55,7 +55,7 @@ jobs:
     environment: staging
     steps:
       - name: Checkout Código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         
       - name: Instalar Trivy no Runner
         run: |
@@ -105,7 +105,7 @@ jobs:
     environment: production
     steps:
       - name: Checkout Código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build e Entrega de Artefactos (PRD)
         env:
