@@ -106,21 +106,36 @@ jobs:
     steps:
       - name: Checkout Código
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Necessário para o histórico de commits e tags
+
+    # NOVA LÓGICA: Cálculo da Versão Semântica
+      - name: Calculate and Bump Version
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: false # Se for um commit normal, não gera tag
 
       - name: Build e Entrega de Artefactos (PRD)
+      # Só corre se houver um commit feat: ou fix: (gerando uma tag nova)
         env:
           DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           GITHUB_ACTIONS: true
+          # Usamos a tag gerada pela Action (v1.1.0, etc)
+          TAG: ${{ steps.tag_version.outputs.new_tag }}
         run: |
-          echo "🏗️ Iniciando Build final de Produção..."
+          echo "🏗️ Iniciando Build final de Produção para a versão: $TAG"
           make docker-build
           
-          echo "🏷️ Gerando Versão Imutável: v${{ github.run_number }}"
-          # O Makefile agora usa a variável TAG que passamos aqui
-          make docker-hub-upload TAG=v${{ github.run_number }}
+          echo "🏷️ Enviando Versão Imutável: $TAG"
+          make docker-hub-upload
           
-          echo "🔄 Atualizando Tag 'latest' no Registry..."
-          make docker-hub-upload TAG=latest
-          
-          echo "✅ Pipeline concluído. Artefactos disponíveis no Docker Hub."
+          echo "🔄 Atualizando Tag 'latest'..."
+          export TAG=latest
+          make docker-hub-upload
+
+      - name: Skip Deploy Message
+        if: steps.tag_version.outputs.new_tag == ''
+        run: echo "⏩ Nenhuma alteração funcional detetada (feat/fix). Ignorando push para o Docker Hub."
