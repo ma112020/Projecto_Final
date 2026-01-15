@@ -110,32 +110,36 @@ jobs:
           fetch-depth: 0 # Necessário para o histórico de commits e tags
 
     # NOVA LÓGICA: Cálculo da Versão Semântica
-      - name: Calculate and Bump Version
+      - name: Calculate and Bump Verinitial_versionsion
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: false # Se for um commit normal, não gera tag
+          # Força a v1.0.0 se for a primeira vez, caso contrário segue o commit
+          initial_version: "1.0.0"
+          default_bump: false
 
       - name: Build e Entrega de Artefactos (PRD)
       # Só corre se houver um commit feat: ou fix: (gerando uma tag nova)
+        if: steps.tag_version.outputs.new_tag != ''
         env:
           DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           GITHUB_ACTIONS: true
-          # Usamos a tag gerada pela Action (v1.1.0, etc)
-          TAG: ${{ steps.tag_version.outputs.new_tag }}
+          # Passamos a tag calculada diretamente para o ambiente
+          ACTUAL_TAG: ${{ steps.tag_version.outputs.new_tag }}
         run: |
-          echo "🏗️ Iniciando Build final de Produção para a versão: $TAG"
-          make docker-build
+          echo "🏗️ Iniciando Build e Push para a versão: $ACTUAL_TAG"
           
-          echo "🏷️ Enviando Versão Imutável: $TAG"
-          make docker-hub-upload
+          # Build das imagens com a nova tag
+          make docker-build TAG=$ACTUAL_TAG
           
-          echo "🔄 Atualizando Tag 'latest'..."
-          export TAG=latest
-          make docker-hub-upload
+          # Push da versão específica (v1.0.0)
+          make docker-hub-upload TAG=$ACTUAL_TAG
+          
+          # Push da tag 'latest' para manter o repositório atualizado
+          make docker-hub-upload TAG=latest
 
       - name: Skip Deploy Message
         if: steps.tag_version.outputs.new_tag == ''
-        run: echo "⏩ Nenhuma alteração funcional detetada (feat/fix). Ignorando push para o Docker Hub."
+        run: echo "⏩ Nenhuma alteração funcional detetada (feat/fix). Ignorando push."
