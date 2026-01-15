@@ -1,0 +1,126 @@
+name: CI/CD Pipeline por Ambientes
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'README.md'
+      - 'RELATORIO.md'
+      - 'docs/**'
+      - '**.drawio.png'
+      - 'reports/**'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # --- 1. AMBIENTE DE DEV (Simplificado: Local Lifecycle) ---
+  quality-gate-dev:
+    name: Quality Gate (DEV Stage)
+    runs-on: ubuntu-latest
+    environment: develop
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalação e Ciclo de Vida Local
+        # O run-local já faz: format, lint, security, start services, load injection e pytest
+        run: |
+          python -m pip install --upgrade "pip>=25.2"
+          make install
+          make run-local
+
+      - name: Parar Serviços (Cleanup)
+        if: always()
+        run: make stop-local
+
+      - name: Upload Relatórios DEV
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: reports-dev
+          path: reports/local/
+
+  # --- 2. AMBIENTE DE STAGING (Integration & Observability) ---
+  test-and-staging:
+    name: Integration & Observability (STG Stage)
+    needs: quality-gate-dev
+    # Só corre se o DEV passar e estivermos em branches relevantes ou PR
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+        
+      - name: Instalar Trivy no Runner
+        run: |
+          wget https://github.com/aquasecurity/trivy/releases/download/v0.48.3/trivy_0.48.3_Linux-64bit.deb
+          sudo dpkg -i trivy_0.48.3_Linux-64bit.deb
+
+      # PASSO 1: SEGURANÇA (FAIL-FAST)
+      - name: Build & Security Scan (Trivy)
+        run: make trivy-scan ENV=docker
+
+      # PASSO 2: INFRAESTRUTURA
+      - name: Start Docker Stack
+        run: |
+          make docker-up
+          echo "Aguardando 45s para estabilização (OTel/Loki/Tempo)..."
+          sleep 45
+
+      # PASSO 3: TESTES DE INTEGRAÇÃO NO CONTENTOR 
+      - name: Container Integration Tests
+        run: make docker-run ENV=docker
+
+      # PASSO 4: TELEMETRIA E CARGA REAL
+      - name: Telemetry & Dashboard Validation
+        env:
+          GRAFANA_USER: ${{ secrets.GRAFANA_USER }}
+          GRAFANA_PASS: ${{ secrets.GRAFANA_PASS }}
+        run: make docker-dashboard ENV=docker
+
+      - name: Shutdown Stack
+        if: always()
+        run: make docker-down
+
+      - name: Upload Staging Reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: reports-stg
+          path: reports/docker/
+
+  # --- 3. AMBIENTE DE PRODUÇÃO (Entrega do Artefacto Versionado) ---
+  deploy-prd:
+    name: Deploy & Push (PRD Stage)
+    needs: test-and-staging
+    # Garante que só corre quando fazes merge/push na MAIN
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Build e Entrega de Artefactos (PRD)
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          GITHUB_ACTIONS: true
+        run: |
+          echo "🏗️ Iniciando Build final de Produção..."
+          make docker-build
+          
+          echo "🏷️ Gerando Versão Imutável: v${{ github.run_number }}"
+          # O Makefile agora usa a variável TAG que passamos aqui
+          make docker-hub-upload TAG=v${{ github.run_number }}
+          
+          echo "🔄 Atualizando Tag 'latest' no Registry..."
+          make docker-hub-upload TAG=latest
+          
+          echo "✅ Pipeline concluído. Artefactos disponíveis no Docker Hub."

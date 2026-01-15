@@ -1,0 +1,72 @@
+# --- 1. FASE DE CONSTRUÇÃO (Build Stage) ---
+FROM python:3.11-slim AS builder
+
+# Define o diretório de trabalho para a construção
+WORKDIR /build
+
+# Copia o requirements.txt
+COPY app/products/requirements.txt .
+
+# Instala as dependências de forma segura e limpa (sem cache)
+RUN pip install --upgrade pip>=25.2 && \
+    pip install --no-cache-dir "jaraco.context>=6.1.0" && \
+    pip install --no-cache-dir -r requirements.txt
+
+# --- 2. FASE FINAL (Runtime Stage) ---
+FROM python:3.11-slim AS stage-1    
+
+# Instala ferramentas como curl, netcat e adduser
+RUN apt-get update && \
+    apt-get install -y curl netcat-openbsd adduser && \
+    pip install --no-cache-dir --upgrade pip>=25.2 && \
+    # Cria utilizador não-root 'appuser' para maior segurança e estabilidade
+    adduser --disabled-password --gecos "" appuser && \
+    rm -rf /var/lib/apt/lists/*
+
+# Define variáveis de ambiente
+ENV PYTHONUNBUFFERED=1
+ENV APP_HOME=/app
+ENV PORT=5001
+
+#Variáveis para OpenTelemetry
+
+ENV OTEL_SERVICE_NAME=products-service
+ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+
+# PYTHONPATH: /app é necessário para encontrar o módulo 'shared'
+ENV PYTHONPATH=${APP_HOME}
+
+WORKDIR ${APP_HOME}
+
+# Copia as dependências instaladas na fase de construção
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# --- [BLINDAGEM TRIVY] ---
+# O pip pode deixar metadados da versão antiga (5.3.0) que enganam o scanner.
+# Como estamos em stage-1 (slim), limpamos qualquer rasto antes de mudar para o utilizador final.
+USER root
+RUN find /usr/local/lib/python3.11/site-packages -name "*jaraco.context-5.3.0*" -exec rm -rf {} + || true
+# -------------------------
+
+# Copia a pasta 'shared' e 'app' (incluindo app/users)
+COPY app/shared ${APP_HOME}/shared
+COPY app ${APP_HOME}/app
+# Copia ficheiros de configuração de teste (CRÍTICO para o Test Runner partilhar)
+COPY tests ${APP_HOME}/tests
+COPY pytest.ini .
+COPY app/shared/wait-for-it.sh /usr/local/bin/wait-for-it.sh
+RUN chmod +x /usr/local/bin/wait-for-it.sh
+
+
+# Garante que o novo utilizador 'appuser' tem permissão de leitura/escrita no diretório da aplicação
+RUN chown -R appuser:appuser ${APP_HOME}
+
+# Expõe a porta
+EXPOSE 5001
+
+# Troca para o utilizador não-root para execução
+USER appuser
+
+# Comando para iniciar a aplicação Uvicorn
+CMD ["sh", "-c", "/usr/local/bin/wait-for-it.sh otel-collector:4317 -- gunicorn -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:5001 app.products.products:app"]
