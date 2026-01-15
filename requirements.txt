@@ -4,8 +4,8 @@ anyio==4.12.0
 asgiref==3.11.0
 Authlib==1.6.6
 backports-datetime-fromisoformat==2.0.3
-bandit==1.9.2
-black==24.4.2
+bandit==1.7.9
+black==25.12.0
 certifi==2025.11.12
 cffi==2.0.0
 charset-normalizer==3.4.4
