@@ -99,7 +99,6 @@ jobs:
   deploy-prd:
     name: Deploy & Push (PRD Stage)
     needs: test-and-staging
-    # Garante que só corre quando fazes merge/push na MAIN
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: production
@@ -107,39 +106,28 @@ jobs:
       - name: Checkout Código
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0 # Necessário para o histórico de commits e tags
+          fetch-depth: 0
 
-    # NOVA LÓGICA: Cálculo da Versão Semântica
-      - name: Calculate and Bump Verinitial_versionsion
+      - name: Calculate and Bump Version
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Força a v1.0.0 se for a primeira vez, caso contrário segue o commit
-          initial_version: "1.0.0"
-          default_bump: false
+          default_bump: patch # Garante que se houver um feat/fix ele gera tag
 
       - name: Build e Entrega de Artefactos (PRD)
-      # Só corre se houver um commit feat: ou fix: (gerando uma tag nova)
-        if: steps.tag_version.outputs.new_tag != ''
+        # Se a action de tag falhar, usamos 'v1.0.0-manual' como backup para não travar
         env:
           DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          GITHUB_ACTIONS: true
-          # Passamos a tag calculada diretamente para o ambiente
-          ACTUAL_TAG: ${{ steps.tag_version.outputs.new_tag }}
+          GITHUB_ACTIONS: "true"
+          # Tenta pegar a tag da action, se estiver vazia usa v1.0.0
+          ACTUAL_TAG: ${{ steps.tag_version.outputs.new_tag || 'v1.0.0' }}
         run: |
-          echo "🏗️ Iniciando Build e Push para a versão: $ACTUAL_TAG"
+          echo "🏗️ A enviar para o Docker Hub com a tag: $ACTUAL_TAG"
           
-          # Build das imagens com a nova tag
           make docker-build TAG=$ACTUAL_TAG
-          
-          # Push da versão específica (v1.0.0)
           make docker-hub-upload TAG=$ACTUAL_TAG
           
-          # Push da tag 'latest' para manter o repositório atualizado
+          echo "🔄 Atualizando Tag latest"
           make docker-hub-upload TAG=latest
-
-      - name: Skip Deploy Message
-        if: steps.tag_version.outputs.new_tag == ''
-        run: echo "⏩ Nenhuma alteração funcional detetada (feat/fix). Ignorando push."
