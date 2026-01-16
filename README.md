@@ -24,31 +24,61 @@ A arquitetura baseia-se em microserviços independentes com instrumentação nat
 
 ### 📂 Estrutura do Projeto
 
-```text
-.
-├── app/
-│   ├── users/                 # Microserviço de Utilizadores (FastAPI)
-│   │   ├── users.py           # Lógica do serviço
-│   │   └── Dockerfile.users   # Build da imagem de utilizadores
-│   ├── products/              # Microserviço de Produtos (FastAPI)
-│   │   ├── products.py        # Lógica do serviço
-│   │   └── Dockerfile.products # Build da imagem de produtos
-│   └── shared/                # Lógica partilhada entre serviços
-│       ├── config.py          # Variáveis de ambiente
-│       ├── tracing.py         # Configuração do OpenTelemetry (SDK)
-│       └── wait-for-it.sh     # Script para orquestração de arranque
-├── config/                    # Configuração da Stack LGTM & Observabilidade
-│   ├── grafana/               # Provisionamento de Dashboards e Fontes de Dados
-│   ├── loki-config.yml        # Configuração de Agregação de Logs
-│   ├── prometheus.yml         # Configuração de Métricas
-│   ├── otel-collector-config.yml # Orquestração de Telemetria (Otel)
-│   ├── promtail-config.yml    # Agente de recolha de logs (Push para Loki)
-│   └── tempo-config.yml       # Configuração de Distributed Tracing
-├── tests/                     # Testes Unitários e de Integração (Pytest)
-├── docker-compose.yml         # Orquestração de contentores (Deployment Agnóstico)
-├── Makefile                   # Automatização de comandos (Build, Up, Down, Test)
-├── README.md                  # Documentação técnica e HLD
 ```
+.
+├── 20260112-HLD-ProjetoFinal-DevOps.drawio.png
+├── app
+│   ├── __init__.py
+│   ├── products
+│   │   ├── Dockerfile.products
+│   │   ├── __init__.py
+│   │   ├── products.py
+│   │   └── requirements.txt
+│   ├── shared
+│   │   ├── config.py
+│   │   ├── __init__.py
+│   │   ├── tracing.py
+│   │   └── wait-for-it.sh
+│   └── users
+│       ├── Dockerfile.users
+│       ├── __init__.py
+│       ├── requirements.txt
+│       └── users.py
+├── config
+│   ├── grafana
+│   │   ├── dashboards
+│   │   │   └── projecto_final.json
+│   │   └── provisioning
+│   │       ├── dashboards
+│   │       │   └── dashboard.yml
+│   │       └── datasources
+│   │           └── datasources.yml
+│   ├── loki-config.yml
+│   ├── otel-collector-config.yml
+│   ├── prometheus.yml
+│   ├── promtail-config.yml
+│   └── tempo-config.yml
+├── config_temp_prom
+│   └── prometheus.yml
+├── .github
+│   ├── dependabot.yml
+│   └── workflows
+│       └── main.yml
+├── tests
+│   ├── __init__.py
+│   ├── test_products.py
+│   └── test_users.py
+├── .gitignore
+├── .trivyignore
+├── docker-compose.yml
+├── Makefile
+├── pytest.ini
+├── README.md
+├── requirements.txt
+└── requirements-dev.txt
+```
+---
+
 
 ## 🛠️ 3. Ferramentas do Pipeline DevOps
 
@@ -103,6 +133,22 @@ Para garantir a longevidade e a resiliência do projeto, foram implementadas as 
 * **GitHub Dependabot:** O repositório utiliza monitorização ativa para identificar vulnerabilidades em dependências Python (PIP) e atualizações críticas nas GitHub Actions, garantindo que o pipeline não se torne obsoleto.
 * **Versionamento Imutável:** O pipeline CI/CD gera tags únicas no Docker Hub baseadas no `GITHUB_RUN_NUMBER`. Esta prática assegura a rastreabilidade total e permite *rollbacks* imediatos para versões anteriores estáveis.
 * **Shift-Left Security:** Integração de análise estática de código (Bandit) e scan de imagens (Trivy) diretamente no fluxo de desenvolvimento, impedindo que vulnerabilidades cheguem a produção.
+
+## 🛡️ 7. Sustentabilidade e Segurança Contínua
+
+Para garantir a longevidade e a resiliência do projeto, foram implementadas as seguintes estratégias de gestão de ciclo de vida:
+
+* **Versionamento Imutável:** O pipeline CI/CD gera tags únicas no Docker Hub baseadas no `GITHUB_RUN_NUMBER`. Esta prática assegura a rastreabilidade total e permite *rollbacks* imediatos para versões anteriores estáveis, garantindo que o ambiente de produção nunca é alterado sem um novo artefacto validado.
+
+* **Histórico de Versões:**
+    * **v1.0.0 (Baseline):** Versão inicial com infraestrutura de observabilidade e pipeline funcional.
+    * **v1.1.0 (Security & Docs Patch):*Atualização de segurança (Patches do Dependabot), gestão de exceções no Trivy e conclusão da documentação técnica e diagramas.
+
+* **GitHub Dependabot (Monitorização Multi-nível):**
+    * **Application:** Vigilância ativa de dependências Python (PIP) em todos os níveis (Root e Microserviços).
+    * **Infrastructure:** Monitorização de atualizações para imagens base Docker e versões das GitHub Actions utilizadas.
+
+* **Shift-Left Security:** Integração de análise estática de código (*Bandit*) e scan de imagens (*Trivy*) diretamente no fluxo de desenvolvimento, impedindo que vulnerabilidades críticas atinjam a branch `main`.
 
 ---
 

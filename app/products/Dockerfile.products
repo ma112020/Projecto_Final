@@ -15,11 +15,11 @@ RUN pip install --upgrade pip>=25.2 && \
 # --- 2. FASE FINAL (Runtime Stage) ---
 FROM python:3.11-slim AS stage-1    
 
-# Instala ferramentas como curl, netcat e adduser
-RUN apt-get update && \
-    apt-get install -y curl netcat-openbsd adduser && \
+# Instala ferramentas como curl, netcat e adduser e updgrade dos pacotes SO
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends curl netcat-openbsd adduser && \
     pip install --no-cache-dir --upgrade pip>=25.2 && \
-    # Cria utilizador não-root 'appuser' para maior segurança e estabilidade
+    # Cria utilizador não-root 'appuser'
     adduser --disabled-password --gecos "" appuser && \
     rm -rf /var/lib/apt/lists/*
 
