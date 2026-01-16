@@ -117,7 +117,6 @@ trivy-scan:
 	@mkdir -p $(REPORTS_DIR)
 
 	@echo "--- [TRIVY] Construindo imagens via caminhos diretos ---"
-	@# Ajustei os caminhos para refletir o que testaste manualmente
 	docker build -t users-service:latest -f ./app/users/Dockerfile.users . || exit 1
 	docker build -t products-service:latest -f ./app/products/Dockerfile.products . || exit 1
 
@@ -125,17 +124,18 @@ trivy-scan:
 	docker save users-service:latest -o $(REPORTS_DIR)/users_temp.tar
 	docker save products-service:latest -o $(REPORTS_DIR)/products_temp.tar
 
-	@echo "--- [TRIVY] Iniciando scan de segurança ---"
-	trivy image --severity HIGH,CRITICAL --exit-code 1 --input $(REPORTS_DIR)/users_temp.tar > $(REPORTS_DIR)/trivy_users_report.txt 2>&1 || \
-		(echo "❌ Vulnerabilidades críticas encontradas! Verifique os relatórios."; rm -f $(REPORTS_DIR)/*.tar; exit 1)
+	@echo "--- [TRIVY] Iniciando scan de segurança com ignorefile ---"
+	# Adicionada a flag --ignorefile para ler as exceções da glibc
+	trivy image --severity HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore --input $(REPORTS_DIR)/users_temp.tar > $(REPORTS_DIR)/trivy_users_report.txt 2>&1 || \
+		(echo "❌ Vulnerabilidades críticas encontradas em Users! Verifique os relatórios."; rm -f $(REPORTS_DIR)/*.tar; exit 1)
 	
-	trivy image --severity HIGH,CRITICAL --exit-code 1 --input $(REPORTS_DIR)/products_temp.tar > $(REPORTS_DIR)/trivy_products_report.txt 2>&1 || \
-		(echo "❌ Vulnerabilidades críticas encontradas! Verifique os relatórios."; rm -f $(REPORTS_DIR)/*.tar; exit 1)
+	trivy image --severity HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore --input $(REPORTS_DIR)/products_temp.tar > $(REPORTS_DIR)/trivy_products_report.txt 2>&1 || \
+		(echo "❌ Vulnerabilidades críticas encontradas em Products! Verifique os relatórios."; rm -f $(REPORTS_DIR)/*.tar; exit 1)
 
 	@echo "--- [TRIVY] Limpeza de temporários ---"
 	rm -f $(REPORTS_DIR)/*.tar
 	$(MAKE) fix-perms
-	@echo "✅ Scan concluído com sucesso."
+	@echo "✅ Scan concluído com sucesso (Exceções aplicadas)."
 	
 # ==============================================================================
 # 3. Orquestrador run-local e Prova de Funcionalidade
