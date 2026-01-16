@@ -141,8 +141,8 @@ Para garantir a longevidade e a resiliência do projeto, foram implementadas as 
 * **Versionamento Imutável:** O pipeline CI/CD gera tags únicas no Docker Hub baseadas no `GITHUB_RUN_NUMBER`. Esta prática assegura a rastreabilidade total e permite *rollbacks* imediatos para versões anteriores estáveis, garantindo que o ambiente de produção nunca é alterado sem um novo artefacto validado.
 
 * **Histórico de Versões:**
-    * **v1.0.0 (Baseline):** Versão inicial com infraestrutura de observabilidade e pipeline funcional.
-    * **v1.1.0 (Security & Docs Patch):*Atualização de segurança (Patches do Dependabot), gestão de exceções no Trivy e conclusão da documentação técnica e diagramas.
+    * **v0.0.1 (Baseline):** Versão inicial com infraestrutura de observabilidade e pipeline funcional.
+    * **v0.0.2 (Security & Docs Patch):*Atualização de segurança (Patches do Dependabot), gestão de exceções no Trivy e conclusão da documentação técnica e diagramas.
 
 * **GitHub Dependabot (Monitorização Multi-nível):**
     * **Application:** Vigilância ativa de dependências Python (PIP) em todos os níveis (Root e Microserviços).
