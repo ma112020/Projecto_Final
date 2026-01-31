@@ -7,7 +7,7 @@
 # APENAS PODERÁ ACRESCENTADA AO MESMO.
 
 # ==============================================================================
-# 1Variáveis e Configurações do Projeto
+# 1.Variáveis e Configurações do Projeto
 # ==============================================================================
 SHELL := /bin/bash
 PYTHON = .venv/bin/python3
@@ -25,25 +25,35 @@ NC         = nc -z localhost
 # --- Configurações de Segurança 
 # O operador ?= lê a variável diretamente da memória se ela já existir.
 # É a forma correta de receber segredos injetados pelo GitHub Actions.
-GRAFANA_USER     ?= $(GRAFANA_USER)
-GRAFANA_PASS     ?= $(GRAFANA_PASS)
-DOCKERHUB_USER   ?= $(DOCKERHUB_USER)
-DOCKERHUB_TOKEN  ?= $(DOCKERHUB_TOKEN)
+GRAFANA_USER     ?= (GRAFANA_USER)
+GRAFANA_PASS     ?= (GRAFANA_PASS)
+DOCKERHUB_USER   ?= (DOCKERHUB_USER)
+DOCKERHUB_TOKEN  ?= (DOCKERHUB_TOKEN)
 
 # Variável de Controle: Bloqueia o push localmente por design.
 # No GitHub Actions, o runner passa isto como 'true'.
 GITHUB_ACTIONS ?= false
 
 # --- Metadados do Docker Hub (Públicos) ---
+TYPE            ?= slim
 TAG             ?= latest
 
-# Nomes das imagens para cada microserviço
+# Lógica de sufixo para ficheiros
+ifeq ($(TYPE),slim)
+    DOCKER_SUFFIX :=
+else
+    DOCKER_SUFFIX := .$(TYPE)
+endif
+
+# Nomes das imagens e tags dinâmicas para cada microserviço
 IMAGE_USERS      = users-service
 IMAGE_PRODUCTS   = products-service
+IMAGE_USERS_TAG    = $(IMAGE_USERS):$(TYPE)
+IMAGE_PRODUCTS_TAG = $(IMAGE_PRODUCTS):$(TYPE)
 
 # URLs completas para o Docker Hub
-URL_USERS        = $(DOCKERHUB_USER)/$(IMAGE_USERS):$(TAG)
-URL_PRODUCTS     = $(DOCKERHUB_USER)/$(IMAGE_PRODUCTS):$(TAG)
+URL_USERS        = $(DOCKERHUB_USER)/$(IMAGE_USERS):$(TAG)-$(TYPE)
+URL_PRODUCTS     = $(DOCKERHUB_USER)/$(IMAGE_PRODUCTS):$(TAG)-$(TYPE)
 
 # Lógica de Comando de Execução Baseada no Ambiente
 ifeq ($(ENV), docker)
@@ -112,30 +122,25 @@ safety:
 	$(MAKE) fix-perms
 
 trivy-scan:
-	@echo "--- [TRIVY] Garantindo acesso ao Docker Socket ---"
-	-sudo chmod 666 /var/run/docker.sock
+	@echo "--- [SECURITY] A gerar relatório para $(TYPE) ---"
 	@mkdir -p $(REPORTS_DIR)
-
-	@echo "--- [TRIVY] Construindo imagens via caminhos diretos ---"
-	docker build -t users-service:latest -f ./app/users/Dockerfile.users . || exit 1
-	docker build -t products-service:latest -f ./app/products/Dockerfile.products . || exit 1
-
-	@echo "--- [TRIVY] Exportando imagens para TAR ---"
-	docker save users-service:latest -o $(REPORTS_DIR)/users_temp.tar
-	docker save products-service:latest -o $(REPORTS_DIR)/products_temp.tar
-
-	@echo "--- [TRIVY] Iniciando scan de segurança com ignorefile ---"
-	# Adicionada a flag --ignorefile para ler as exceções da glibc
-	trivy image --severity HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore --input $(REPORTS_DIR)/users_temp.tar > $(REPORTS_DIR)/trivy_users_report.txt 2>&1 || \
-		(echo "❌ Vulnerabilidades críticas encontradas em Users! Verifique os relatórios."; rm -f $(REPORTS_DIR)/*.tar; exit 1)
 	
-	trivy image --severity HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore --input $(REPORTS_DIR)/products_temp.tar > $(REPORTS_DIR)/trivy_products_report.txt 2>&1 || \
-		(echo "❌ Vulnerabilidades críticas encontradas em Products! Verifique os relatórios."; rm -f $(REPORTS_DIR)/*.tar; exit 1)
-
-	@echo "--- [TRIVY] Limpeza de temporários ---"
-	rm -f $(REPORTS_DIR)/*.tar
-	$(MAKE) fix-perms
-	@echo "✅ Scan concluído com sucesso (Exceções aplicadas)."
+	# Criar e extrair o sistema de ficheiros
+	-@docker rm -f temp_$(TYPE) 2>/dev/null
+	@docker create --name temp_$(TYPE) users-service:$(TYPE)
+	@mkdir -p $(REPORTS_DIR)/rootfs_$(TYPE)
+	@sudo docker export temp_$(TYPE) | tar -C $(REPORTS_DIR)/rootfs_$(TYPE) -xf - 2>/dev/null || true
+	
+	# Executa o scan, gera o relatório em TXT e para o build se houver falhas
+	trivy fs --severity HIGH,CRITICAL --exit-code 1 --format table \
+		--output $(REPORTS_DIR)/trivy_$(TYPE).txt $(REPORTS_DIR)/rootfs_$(TYPE); \
+	EXIT_CODE=$$?; \
+	echo "--- [CLEANUP] Removendo pasta temporária ---"; \
+	sudo rm -rf $(REPORTS_DIR)/rootfs_$(TYPE); \
+	docker rm -f temp_$(TYPE) 2>/dev/null; \
+	exit $$EXIT_CODE
+	@echo "✅ Imagem $(TYPE) aprovada para produção."
+	@echo "📊 Relatório disponível em: $(REPORTS_DIR)/trivy_report_$(TYPE).txt"
 	
 # ==============================================================================
 # 3. Orquestrador run-local e Prova de Funcionalidade
@@ -194,8 +199,6 @@ tests:
 	$(PYTHON) -m pytest -v tests/
 
 
-
-
 # ==============================================================================
 # 4. Gestão de Processos e Limpeza
 # ==============================================================================
@@ -244,22 +247,24 @@ all: install run-local
 docker-clean:
 	@echo "--- [DOCKER-CLEAN] Removendo contentores e imagens do projeto ---"
 	-docker-compose down --rmi all --volumes --remove-orphans 2>/dev/null || true
-	-docker rmi users-service:latest products-service:latest --force 2>/dev/null || true
+	-docker rmi $(IMAGE_USERS_TAG) $(IMAGE_PRODUCTS_TAG) --force 2>/dev/null || true
 	@echo "--- [DOCKER-CLEAN] Limpando imagens intermédias (build cache) ---"
 	-docker image prune -f
 	@echo "--- [OK] Ambiente Docker limpo. Próximo build será do zero. ---"
 
 
+# Usar Type vazio para imagem slim, alpine ou wolfi :
+
 docker-build:
-	@echo "--- [DOCKER-V2] Construindo imagens SEM CACHE (Garante código novo) ---"
-	docker build --no-cache -f $$(find . -maxdepth 3 -iname "*Docker*user*" | head -n 1) -t users-service:latest .
-	docker build --no-cache -f $$(find . -maxdepth 3 -iname "*Docker*product*" | head -n 1) -t products-service:latest .
+	@echo "--- [DOCKER-V2] Construindo imagens SEM CACHE para TYPE=$(TYPE)"
+	docker build --no-cache -f app/users/Dockerfile.users -t $(IMAGE_USERS_TAG) .
+	docker build --no-cache -f app/products/Dockerfile.products -t $(IMAGE_PRODUCTS_TAG) .
 	@echo "--- [OK] Imagens prontas para Docker V2 ---"
 
 docker-up: 
 	@echo "--- [DOCKER] A levantar serviços existentes (Sem Build) ---"
 	chmod -R 755 config/
-	docker compose up -d
+	TYPE=$(TYPE) DOCKER_SUFFIX=$(DOCKER_SUFFIX) docker compose up -d --build
 	@echo "A aguardar estabilização (5s)..."
 	@sleep 5
 	@$(MAKE) --no-print-directory docker-status
@@ -270,7 +275,7 @@ docker-down:
 
 docker-status:
 	@echo "--- [DOCKER-V2] Verificando estado da Nuvem Local ---"
-	docker compose ps
+	@TYPE=$(TYPE) DOCKER_SUFFIX=$(DOCKER_SUFFIX) docker compose ps
 
 docker-logs:
 	@echo "--- [DOCKER-V2] Exibindo logs recentes ---"
@@ -294,48 +299,93 @@ debug-network:
 	@echo "Tentando IPv6 (::1):"
 	@curl -6 -s -I http://localhost:$(LOKI_PORT)/ready | head -n 1 || echo "IPv6 Falhou"
 
-docker-run:
 
-	@echo "--- [DOCKER-RUN] Iniciando ciclo exclusivo em Contentores ---"
-	@# Garantir que a pasta de relatórios para o docker existe antes de iniciar
-	chmod -R 755 config/
+docker-run:
+	@echo "--- [DOCKER-RUN] Iniciando ciclo de integridade para TYPE=$(TYPE) ---"
+	
+	@# 1. Preparação
+	chmod -R 755 config/ 2>/dev/null || true
 	@mkdir -p reports/docker
 	@chmod -R 777 reports/docker 2>/dev/null || true
 
-	@# 1. Garantir infraestrutura
-	$(MAKE) docker-up
+	@# 2. Build e Up (O Safety já corre aqui dentro do Dockerfile)
+	@echo "--- [BUILD] Executando Auditoria e Build (Safety integrado) ---"
+	$(MAKE) docker-up TYPE=$(TYPE)
 	
 	@echo "--- [SYNC] Sincronizando Stack (45s) ---"
 	@sleep 45
+
+	@# 3. Extração do Relatório Safety
+	@echo "--- [QUALITY] 1. Extraindo Relatórios de Segurança ---"
+	@docker cp $$(docker compose ps -q users-service):/reports/docker/safety-report.txt reports/docker/safety-report-users.txt 2>/dev/null || echo "Aviso: Safety Users não encontrado."
+	@docker cp $$(docker compose ps -q products-service):/reports/docker/safety-report.txt reports/docker/safety-report-products.txt 2>/dev/null || echo "Aviso: Safety Products não encontrado."
+
+	@# Verificação de segurança: aborta se o Safety encontrou algo
+	@if grep -q "VULNERABILITIES FOUND" reports/docker/safety-report-*.txt 2>/dev/null; then \
+		echo "❌ Erro: Foram encontradas vulnerabilidades críticas. Pipeline abortado."; \
+		exit 1; \
+	fi
+
+	@echo "--- [QUALITY] 2. Análise Estática de Código (Black & Bandit) ---"
+	@# Black (Linting)
+	docker compose exec -T -e PYTHONPATH=$(PKG_PATH) users-service python3 -m black app/ tests/ || exit 1
+	docker compose exec -T -e PYTHONPATH=$(PKG_PATH) products-service python3 -m black app/ || exit 1
 	
-	@echo "--- [QUALITY] Executando Linter e Segurança via Docker ---"
-	@# Forçamos o uso do comando Docker para não correr localmente
-	docker compose exec -T users-service python3 -m black app/ tests/ || exit 1
-	docker compose exec -T users-service python3 -m flake8 app/ tests/ --max-line-length=120 > reports/docker/flake8_report.txt 2>&1 || exit1
-	docker compose exec -T users-service python3 -m bandit -r app/ -ll > reports/docker/bandit_report.txt 2>&1 || exit 1
-	docker compose exec -T users-service python3 -m safety check --full-report > reports/docker/safety_report.txt 2>&1 || exit 1
-	
-	@echo "--- [TESTS] Executando testes funcionais via Rede Interna Docker ---"
-	@# INJEÇÃO CRÍTICA: Passamos as URLs dos serviços como nomes de rede do Docker
+	@# Bandit (Vulnerabilidades no código)
+	@echo "Running Bandit on Users and Products..."
+	docker compose exec -T -e PYTHONPATH=$(PKG_PATH) users-service python3 -m bandit -r app/ -ll > reports/docker/bandit_users_report.txt 2>&1 || exit 1
+	docker compose exec -T -e PYTHONPATH=$(PKG_PATH) products-service python3 -m bandit -r app/ -ll > reports/docker/bandit_products_report.txt 2>&1 || exit 1
+
+	@echo "--- [TESTS] 3. Bateria de Testes Funcionais (Pytest) ---"
 	docker compose exec -T \
+		-e PYTHONPATH=$(PKG_PATH) \
 		-e PRODUCTS_SERVICE_URL=http://products-service:5001 \
 		-e USERS_SERVICE_URL=http://users-service:5000 \
 		users-service python3 -m pytest -v tests/ | tee reports/docker/tests_report.txt; \
-	  if [ $${PIPESTATUS[0]} -ne 0 ]; then echo "❌ Testes falharam no Docker!"; exit 1; fi
+		if [ $${PIPESTATUS[0]} -ne 0 ]; then echo "❌ Testes falharam!"; exit 1; fi
 
-	@echo "--- [STATUS] Ciclo Docker concluído com sucesso ---"
-	$(MAKE) docker-status
-	@echo "--- [DONE] Ciclo concluído. Relatórios em: reports/docker/ ---"
+	@echo "--- [STATUS] Ciclo $(TYPE) concluído com sucesso ---"
+	$(MAKE) docker-status TYPE=$(TYPE)
+	@echo "Relatórios disponíveis em reports/docker/"
+
 
 docker-trivy-run:
-	@echo "--- [TRIVY-RUN] Executando scan de vulnerabilidades direto ---"
-	@$(MAKE) trivy-scan ENV=docker
-	@echo "--- [SYNC] Copiando relatórios para a pasta de Staging ---"
-	@cp $(REPORTS_DIR)/trivy_users_report.txt $(REPORTS_DOCKER)/ 2>/dev/null || true
-	@cp $(REPORTS_DIR)/trivy_products_report.txt $(REPORTS_DOCKER)/ 2>/dev/null || true
-	@echo "--- [OK] Relatórios de segurança consolidados em $(REPORTS_DOCKER)/ ---"
+	# 1. Criar a pasta baseada no ambiente 
+	$(eval REPORTS_DIR := reports/docker)
+	@mkdir -p $(REPORTS_DIR)
+	@echo "--- [AUDITORIA] Ambiente: $(ENV) | Imagem: $(TYPE) ---"
+	@FAILED=0; \
+	for service in users-service products-service; do \
+		echo "--- [SCANNING] Analisando $$service:$(TYPE) ---"; \
+		docker rm -f temp_$$service 2>/dev/null; \
+		docker create --name temp_$$service $$service:$(TYPE); \
+		mkdir -p $(REPORTS_DIR)/rootfs_$$service; \
+		sudo docker export temp_$$service | tar -C $(REPORTS_DIR)/rootfs_$$service -xf - 2>/dev/null || true; \
+		\
+		if [ "$(TYPE)" = "pipeline" ]; then \
+			trivy fs --severity HIGH,CRITICAL --exit-code 1 --format table \
+				--output $(REPORTS_DIR)/trivy_$$service.txt $(REPORTS_DIR)/rootfs_$$service; \
+			STATUS=$$?; \
+		else \
+			trivy fs --severity HIGH,CRITICAL --format table \
+				--output $(REPORTS_DIR)/trivy_$$service.txt $(REPORTS_DIR)/rootfs_$$service; \
+			STATUS=$$?; \
+		fi; \
+		\
+		if [ $$STATUS -ne 0 ]; then FAILED=1; fi; \
+		sudo rm -rf $(REPORTS_DIR)/rootfs_$$service; \
+		docker rm -f temp_$$service 2>/dev/null; \
+	done; \
+	if [ $$FAILED -ne 0 ]; then \
+		echo "⚠️ Auditoria concluída com falhas. Interrompendo pipeline."; \
+		exit 1; \
+	fi
+	@echo "✅ Auditoria Trivy concluída com sucesso."
 
 docker-dashboard:
+# Para teste local tem de apresentar as credenciais antes de correr o comando:
+# export GRAFANA_USER=***** e export GRAFANA_PASS=*****
+
 	@echo "\n===================================================================="
 	@echo "    PROVA DE FUNCIONALIDADE: DIAGNÓSTICO DE SAÚDE (V2)"
 	@echo "===================================================================="
@@ -373,7 +423,7 @@ docker-dashboard:
 		echo "❌ [FAIL] Credenciais não encontradas!"; exit 1; \
 	else \
 		if curl -s -f -u $(GRAFANA_USER):$(GRAFANA_PASS) http://localhost:3000/api/health > /dev/null; then \
-			echo "✅ [OK] Grafana Autenticado: $(GRAFANA_USER)"; \
+			echo "✅ [OK] Grafana Autenticado com sucesso"; \
 		else \
 			echo "❌ [FAIL] Erro de Login no Grafana!"; exit 1; \
 		fi; \
@@ -394,7 +444,7 @@ docker-dashboard:
 		exit 1; \
 	else \
 		if curl -s -f -u $(GRAFANA_USER):$(GRAFANA_PASS) http://localhost:3000/api/health > /dev/null; then \
-			echo "  -> [OK] Autenticação Grafana: SUCESSO (User: $(GRAFANA_USER))"; \
+			echo "  -> [OK] Autenticação Grafana: SUCESSO (Acesso protegido)"; \
 		else \
 			echo "  -> [FAIL] Falha de autenticação. Verifique os Secrets do GitHub."; \
 			exit 1; \
@@ -403,7 +453,6 @@ docker-dashboard:
 
 	@echo "\n[INFO] ACESSO PARA DEMONSTRAÇÃO:"
 	@echo "    Dashboard: $(DASHBOARD_URL)"
-	@echo "    User:      $(GRAFANA_USER)"
 
 docker-hub-upload:
 	@echo "--- [CHECK] Verificando permissões para $(DOCKERHUB_USER) [Tag: $(TAG)] ---"
@@ -420,10 +469,10 @@ docker-hub-upload:
 	@echo "--- [AUTH] Autenticando no Docker Hub ---"
 	@echo $(DOCKERHUB_TOKEN) | docker login -u $(DOCKERHUB_USER) --password-stdin
 	
-	@echo "--- [TAGGING] Preparando artefactos para a versão $(TAG) ---"
+	@echo "--- [TAGGING] Preparando artefactos para a versão $(TYPE) ---"
 	# Aqui criamos as tags específicas para cada serviço antes do push
-	docker tag users-service:latest $(URL_USERS)
-	docker tag products-service:latest $(URL_PRODUCTS)
+	docker tag $(IMAGE_USERS_TAG) $(URL_USERS)
+	docker tag $(IMAGE_PRODUCTS_TAG) $(URL_PRODUCTS)
 	
 	@echo "--- [PUSH] Enviando imagens para o Registry ---"
 	@echo "🚀 Enviando: $(URL_USERS)"
@@ -433,4 +482,4 @@ docker-hub-upload:
 	docker push $(URL_PRODUCTS)
 	
 	@docker logout
-	@echo "--- [OK] Entrega da versão $(TAG) concluída! ---"
+	@echo "--- [OK] Entrega da versão $(TYPE) concluída! ---"

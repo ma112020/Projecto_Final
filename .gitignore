@@ -25,7 +25,9 @@ p**/pycache/
 
 #3. RELATÓRIOS E OUTPUTS (Gerados por QA/Segurança/Testes)
 
-..log
+reports/
+**/reports/
+*.log
 .coverage
 **/htmlcov/
 **/.pytest_cache/
@@ -39,8 +41,11 @@ trivy-*.json
 Relatorio_final.md
 *.pdf
 
+#4. Ignorar pastas de cenários (apenas para o ZIP)
 
-#4.  DOCKER VOLUMES E DADOS PERSISTENTES (DADOS BINÁRIOS)
+/Scenarios/
+
+# 5.  DOCKER VOLUMES E DADOS PERSISTENTES (DADOS BINÁRIOS)
 
 **/prometheus_data/
 **/loki_data/
@@ -48,8 +53,9 @@ Relatorio_final.md
 **/grafana_data/
 **/data/
 
-# 5. CONFIGURAÇÕES SENSÍVEIS E AMBIENTE
-
+# 6. CONFIGURAÇÕES SENSÍVEIS E AMBIENTE
+secrets
+my.secrets
 .env
 .env.*
 !.env.example

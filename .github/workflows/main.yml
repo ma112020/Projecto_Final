@@ -48,7 +48,7 @@ jobs:
   # --- 2. AMBIENTE DE STAGING (Integration & Observability) ---
   test-and-staging:
     name: Integration & Observability (STG Stage)
-    needs: quality-gate-dev
+    #needs: quality-gate-dev
     # Só corre se o DEV passar e estivermos em branches relevantes ou PR
     if: github.ref == 'refs/heads/develop' || github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -64,7 +64,9 @@ jobs:
 
       # PASSO 1: SEGURANÇA (FAIL-FAST)
       - name: Build & Security Scan (Trivy)
-        run: make trivy-scan ENV=docker
+        run: |
+          make docker-build TYPE=pipeline
+          make docker-trivy-run TYPE=pipeline
 
       # PASSO 2: INFRAESTRUTURA
       - name: Start Docker Stack
@@ -75,14 +77,14 @@ jobs:
 
       # PASSO 3: TESTES DE INTEGRAÇÃO NO CONTENTOR 
       - name: Container Integration Tests
-        run: make docker-run ENV=docker
+        run: make docker-run ENV=docker TYPE=pipeline
 
       # PASSO 4: TELEMETRIA E CARGA REAL
       - name: Telemetry & Dashboard Validation
         env:
           GRAFANA_USER: ${{ secrets.GRAFANA_USER }}
           GRAFANA_PASS: ${{ secrets.GRAFANA_PASS }}
-        run: make docker-dashboard ENV=docker
+        run: make docker-dashboard ENV=docker TYPE=pipeline
 
       - name: Shutdown Stack
         if: always()

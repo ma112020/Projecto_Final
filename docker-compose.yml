@@ -17,7 +17,7 @@ services:
     build:
       context: .
       dockerfile: app/users/Dockerfile.users
-    image: users-service:latest
+    image: users-service:${TYPE:-latest}
     container_name: users-service
     environment:
       # Endpoint para onde o código Python envia os spans (traces)
@@ -39,7 +39,7 @@ services:
     build:
       context: .
       dockerfile: app/products/Dockerfile.products
-    image: products-service:latest
+    image: products-service:${TYPE:-latest}
     container_name: products-service
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317

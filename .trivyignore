@@ -1,9 +1,0 @@
-# --- EXCEÇÕES DE SEGURANÇA TEMPORÁRIAS ---
-# Estas vulnerabilidades pertencem ao Sistema Operativo (Debian 13)
-# e não têm correção (Fixed Version) disponível até à data.
-# O Dependabot irá avisar quando a imagem base for atualizada com o fix.
-
-# glibc: Integer overflow em memalign que causa heap corruption
-# Status: Affected (Sem fix oficial no Debian 13 ainda)
-# Monitorizar: https://security-tracker.debian.org/tracker/CVE-2026-0861
-CVE-2026-0861
