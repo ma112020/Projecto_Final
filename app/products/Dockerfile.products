@@ -1,8 +1,18 @@
 # --- 1. FASE DE CONSTRUÇÃO (Build Stage) ---
-FROM python:3.11-slim AS builder
+FROM python:3.11-alpine AS builder
 
 # Define o diretório de trabalho para a construção
 WORKDIR /build
+
+# Dependências de compilação para Alpine
+RUN apk add --no-cache \
+    gcc \
+    g++ \
+    musl-dev \
+    linux-headers \
+    libffi-dev \
+    openssl-dev \
+    make
 
 # Copia o requirements.txt
 COPY app/products/requirements.txt .
@@ -12,16 +22,31 @@ RUN pip install --upgrade pip>=25.2 && \
     pip install --no-cache-dir "jaraco.context>=6.1.0" && \
     pip install --no-cache-dir -r requirements.txt
 
-# --- 2. FASE FINAL (Runtime Stage) ---
-FROM python:3.11-slim AS stage-1    
+# 1. Instalar Safety e criar pasta de relatórios
+RUN pip install --no-cache-dir --break-system-packages safety 
 
-# Instala ferramentas como curl, netcat e adduser e updgrade dos pacotes SO
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends curl netcat-openbsd adduser && \
-    pip install --no-cache-dir --upgrade pip>=25.2 && \
-    # Cria utilizador não-root 'appuser'
-    adduser --disabled-password --gecos "" appuser && \
-    rm -rf /var/lib/apt/lists/*
+# 2. Criar a pasta E gerar o relatório num único passo seguro
+RUN mkdir -p /reports/docker && \
+    safety check -r requirements.txt --full-report > /reports/docker/safety-report.txt || \
+    (echo "⚠️ Safety encontrou vulnerabilidades" && cat /reports/docker/safety-report.txt)
+
+# 3. Instalação das dependências (Target isolado)
+RUN mkdir -p /app/dependencies && \
+    pip install --no-cache-dir --target=/app/dependencies -r requirements.txt
+
+
+# --- 2. FASE FINAL (Runtime Stage) ---
+FROM python:3.11-alpine AS stage-1    
+
+# Instala ferramentas como curl, netcat-openbsd  e adduser no Alpine
+RUN apk update && apk upgrade && \
+    apk add --no-cache \
+    curl \
+    netcat-openbsd \
+    bash \
+    libstdc++ \
+    && pip install --no-cache-dir --upgrade pip>=25.2 \
+    && adduser -D -g "" appuser
 
 # Define variáveis de ambiente
 ENV PYTHONUNBUFFERED=1
@@ -41,10 +66,10 @@ WORKDIR ${APP_HOME}
 # Copia as dependências instaladas na fase de construção
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /reports/docker/safety-report.txt /reports/docker/safety-report.txt
 
 # --- [BLINDAGEM TRIVY] ---
-# O pip pode deixar metadados da versão antiga (5.3.0) que enganam o scanner.
-# Como estamos em stage-1 (slim), limpamos qualquer rasto antes de mudar para o utilizador final.
+ 
 USER root
 RUN find /usr/local/lib/python3.11/site-packages -name "*jaraco.context-5.3.0*" -exec rm -rf {} + || true
 # -------------------------
@@ -56,11 +81,7 @@ COPY app ${APP_HOME}/app
 COPY tests ${APP_HOME}/tests
 COPY pytest.ini .
 COPY app/shared/wait-for-it.sh /usr/local/bin/wait-for-it.sh
-RUN chmod +x /usr/local/bin/wait-for-it.sh
-
-
-# Garante que o novo utilizador 'appuser' tem permissão de leitura/escrita no diretório da aplicação
-RUN chown -R appuser:appuser ${APP_HOME}
+RUN chmod +x /usr/local/bin/wait-for-it.sh && chown -R appuser:appuser ${APP_HOME}
 
 # Expõe a porta
 EXPOSE 5001
