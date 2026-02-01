@@ -483,3 +483,4 @@ docker-hub-upload:
 	
 	@docker logout
 	@echo "--- [OK] Entrega da versão $(TYPE) concluída! ---"
+#

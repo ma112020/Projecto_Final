@@ -25,7 +25,7 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Instalação e Ciclo de Vida Local
         # O run-local já faz: format, lint, security, start services, load injection e pytest
@@ -48,7 +48,7 @@ jobs:
   # --- 2. AMBIENTE DE STAGING (Integration & Observability) ---
   test-and-staging:
     name: Integration & Observability (STG Stage)
-    #needs: quality-gate-dev
+    needs: quality-gate-dev
     # Só corre se o DEV passar e estivermos em branches relevantes ou PR
     if: github.ref == 'refs/heads/develop' || github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
