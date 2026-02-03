@@ -91,7 +91,7 @@ stevedore==5.6.0
 tenacity==9.1.2
 tomli==2.3.0
 tomlkit==0.13.3
-tqdm==4.67.1
+tqdm==4.67.2
 typer==0.20.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
