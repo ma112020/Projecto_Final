@@ -1,13 +1,15 @@
 # Projecto_Final
-*Este projeto foi desenvolvido como parte integrante da avaliação da disciplina de DevOps.*
+*Este projeto foi desenvolvido como parte integrante da avaliação da disciplina de DevOps Engineering.*
 
 ---
 
 ## 🏗️ Microservices CI/CD Pipeline & Observability Stack
 
-Este repositório contém uma solução de engenharia DevOps para microserviços Python, focada em automação, segurança integrada e observabilidade total. O projeto implementa um pipeline de entrega contínua que garante a imutabilidade dos artefactos através de versionamento no Docker Hub.
+
+Este repositório contém uma solução de engenharia DevOps para microserviços Python, focada em automação, segurança integrada e observabilidade total. O projeto implementa um pipeline de Continuous Integration (CI), Continuous Delivery (CD) e Continuous Deployment, garantindo a imutabilidade dos artefactos através do versionamento automatizado no Docker Hub.
 
 ---
+
 
 ## 📐 1. Arquitetura do Sistema (HLD)
 
@@ -24,7 +26,7 @@ A arquitetura baseia-se em microserviços independentes com instrumentação nat
 
 ### 📂 Estrutura do Projeto
 
-```
+```text
 .
 ├── 20260112-HLD-ProjetoFinal-DevOps.drawio.png
 ├── app
@@ -47,12 +49,8 @@ A arquitetura baseia-se em microserviços independentes com instrumentação nat
 ├── config
 │   ├── grafana
 │   │   ├── dashboards
-│   │   │   └── projecto_final.json
 │   │   └── provisioning
-│   │       ├── dashboards
-│   │       │   └── dashboard.yml
-│   │       └── datasources
-│   │           └── datasources.yml
+│   ├── grafana-datasources.yml
 │   ├── loki-config.yml
 │   ├── otel-collector-config.yml
 │   ├── prometheus.yml
@@ -60,26 +58,18 @@ A arquitetura baseia-se em microserviços independentes com instrumentação nat
 │   └── tempo-config.yml
 ├── config_temp_prom
 │   └── prometheus.yml
-├── .github
-│   ├── dependabot.yml
-│   └── workflows
-│       └── main.yml
-├── tests
-│   ├── __init__.py
-│   ├── test_products.py
-│   └── test_users.py
-├── .gitignore
-├── .trivyignore
 ├── docker-compose.yml
 ├── Makefile
 ├── pytest.ini
 ├── README.md
+├── README_original.md
+├── requirements-dev.txt
 ├── requirements.txt
-└── requirements-dev.txt
+└── tests
+    ├── __init__.py
+    ├── test_products.py
+    └── test_users.py
 ```
----
-
-
 ## 🛠️ 3. Ferramentas do Pipeline DevOps
 
 O pipeline integra ferramentas de análise e observabilidade para garantir a qualidade e a visibilidade do software desde a sua construção.
@@ -128,27 +118,15 @@ Após a subida da infraestrutura com o comando `make docker-up`:
 
 ## 🛡️ 7. Sustentabilidade e Segurança Contínua
 
-Para garantir a longevidade e a resiliência do projeto, foram implementadas as seguintes estratégias de gestão de ciclo de vida:
+Para garantir a longevidade e a resiliência do projeto, foram implementadas as seguintes estratégias de gestão de ciclo de vida, documentada nas execuções de pipeline:
 
-* **GitHub Dependabot:** O repositório utiliza monitorização ativa para identificar vulnerabilidades em dependências Python (PIP) e atualizações críticas nas GitHub Actions, garantindo que o pipeline não se torne obsoleto.
-* **Versionamento Imutável:** O pipeline CI/CD gera tags únicas no Docker Hub baseadas no `GITHUB_RUN_NUMBER`. Esta prática assegura a rastreabilidade total e permite *rollbacks* imediatos para versões anteriores estáveis.
-* **Shift-Left Security:** Integração de análise estática de código (Bandit) e scan de imagens (Trivy) diretamente no fluxo de desenvolvimento, impedindo que vulnerabilidades cheguem a produção.
-
-## 🛡️ 7. Sustentabilidade e Segurança Contínua
-
-Para garantir a longevidade e a resiliência do projeto, foram implementadas as seguintes estratégias de gestão de ciclo de vida:
-
-* **Versionamento Imutável:** O pipeline CI/CD gera tags únicas no Docker Hub baseadas no `GITHUB_RUN_NUMBER`. Esta prática assegura a rastreabilidade total e permite *rollbacks* imediatos para versões anteriores estáveis, garantindo que o ambiente de produção nunca é alterado sem um novo artefacto validado.
-
+* **Versionamento Imutável:** O pipeline CI/CD gera tags únicas no Docker Hub baseadas no histórico de builds. Esta prática assegura a rastreabilidade total e permite **Continuous Deployment** de artefactos validados.
 * **Histórico de Versões:**
     * **v0.0.1 (Baseline):** Versão inicial com infraestrutura de observabilidade e pipeline funcional.
-    * **v0.0.2 (Security & Docs Patch):*Atualização de segurança (Patches do Dependabot), gestão de exceções no Trivy e conclusão da documentação técnica e diagramas.
-
-* **GitHub Dependabot (Monitorização Multi-nível):**
-    * **Application:** Vigilância ativa de dependências Python (PIP) em todos os níveis (Root e Microserviços).
-    * **Infrastructure:** Monitorização de atualizações para imagens base Docker e versões das GitHub Actions utilizadas.
-
-* **Shift-Left Security:** Integração de análise estática de código (*Bandit*) e scan de imagens (*Trivy*) diretamente no fluxo de desenvolvimento, impedindo que vulnerabilidades críticas atinjam a branch `main`.
+    * **v0.0.2 (Security & Docs):** Atualização de dependências via Dependabot e documentação técnica.
+    * **v0.0.3 (Hardening Final):** Migração para **Alpine Linux** (resolução da CVE-2026-0681) e aplicação de patch específico para **Protobuf v6.33.5** (resolução da CVE-2026-0994). **Remoção definitiva do .trivyignore**, atingindo o estado de **Zero-CVE**.
+* **GitHub Dependabot:** Monitorização ativa de dependências (PIP) e segurança das GitHub Actions.
+* **Shift-Left Security:** Scans de segurança automatizados (**Trivy**) que garantem a integridade da **Continuous Delivery**, bloqueando a branch `main` em caso de falha de segurança ou vulnerabilidades críticas, eliminando a necessidade de exceções manuais.
 
 ---
 
