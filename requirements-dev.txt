@@ -79,7 +79,7 @@ regex==2025.11.3
 requests==2.32.5
 respx==0.22.0
 rich==14.2.0
-rich-toolkit==0.17.1
+rich-toolkit==0.19.7
 ruamel.yaml==0.18.17
 ruamel.yaml.clib==0.2.15
 safety==3.7.0
