@@ -1,8 +1,8 @@
 # 🏗️ Microservices Pipeline & Observability Stack
-*A robust CI/CD workflow for Python Microservices with a focus on Security Hardening and Full-Stack Visibility.*
+*A journey from simple CI/CD to a Zero-CVE Hardened Ecosystem.*
 
-> [!NOTE]
-> This project was developed as an integral part of the assessment for the **DevOps Engineering** course.
+
+*Note: This project was developed as part of a professional DevOps Engineering certification by Tokio School.*
 
 ---
 
@@ -73,8 +73,8 @@ This project serves as a robust baseline for cloud-native growth. Future work wo
 ## 📖 Detailed Technical Reports and Future Improvements
 For a deep dive into the engineering decisions and the security roadmap:
 
-* 🇬🇧 **[Technical Report (English)](./TECHNICAL_REPORT_EN.md)** 
-* 🇵🇹 **[Relatório Técnico (Português)](./RELATORIO_TECNICO_PT.md)** 
+* 🇬🇧 **[Technical Report (English)](./Tecnhical_Report_EN.md)** 
+* 🇵🇹 **[Relatório Técnico (Português)](./Relatorio_Tecnico_PT.md)** 
 
 ---
 
