@@ -73,7 +73,7 @@ This project serves as a robust baseline for cloud-native growth. Future work wo
 ## 📖 Detailed Technical Reports and Future Improvements
 For a deep dive into the engineering decisions and the security roadmap:
 
-* 🇬🇧 **[Technical Report (English)](./Tecnhical_Report_EN.md)** 
+* 🇬🇧 **[Technical Report (English)](./Technical_Report_EN.md)** 
 * 🇵🇹 **[Relatório Técnico (Português)](./Relatorio_Tecnico_PT.md)** 
 
 ---
