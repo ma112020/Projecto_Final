@@ -101,7 +101,7 @@ uvicorn>=0.40.0
 uvloop==0.22.1
 watchfiles==1.1.1
 websockets==15.0.1
-wrapt==1.17.3
+wrapt==2.1.1
 zipp==3.23.0
 setuptools==80.9.0
 jaraco.context>=6.1.0
