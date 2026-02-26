@@ -2,7 +2,7 @@ annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.12.1
 asgiref==3.11.0
-Authlib==1.6.6
+Authlib==1.6.8
 backports-datetime-fromisoformat==2.0.3
 bandit==1.7.9
 black==26.1.0
