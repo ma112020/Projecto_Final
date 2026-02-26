@@ -105,7 +105,7 @@ Performing this work and implementing what I learned during the DevOps course wa
 
 * **🐳 Docker Multi-stage and Active Security:** To optimize the infrastructure, I applied the **Multi-stage builds** technique, separating the build environment from the execution environment to obtain lighter and more secure images. In the field of security, I used **Trivy** and **Dependabot** for auditing. The central goal and the greatest learning challenge was to achieve a **Zero-CVE** state without compromising project functionality. I used Trivy as a real **Security Gate**.
 
-> **Note:** Although the use of a **.trivyignore** file is a common practice when no patches exist, it was decided that its use would not be acceptable in this project. Thus, the strategy was to raise the level of requirement: instead of "consciously ignoring" existing vulnerabilities, I opted to resolve them at the source, ensuring that nothing passes to production without being 100% verified. (The resolution process can be followed in the **Scenarios** folder.)
+> **Note:** Although the use of a **.trivyignore** file is a common practice when no patches exist, it was decided that its use would not be acceptable in this project. Thus, the strategy was to raise the level of requirement: instead of "consciously ignoring" existing vulnerabilities, I opted to resolve them at the source, ensuring that nothing passes to production without being 100% verified. 
 
 #### Security Best Practices Investigation (Hardening Debian -> Alpine):
 The **python:slim** (Debian) image presented the vulnerability **CVE-2026-0861** in the **glibc** library. This deep flaw in the OS had no available fix. The decision to migrate to **Alpine Linux** was based on two factors:
